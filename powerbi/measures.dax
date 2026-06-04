@@ -1,0 +1,133 @@
+// ============================================================
+//  Sales Dashboard — DAX Measures
+//  Mirrors wireframe boards A · B · C · D
+// ============================================================
+
+// ── Core KPIs ──────────────────────────────────────────────
+
+[MTD Sales] =
+CALCULATE(
+    SUM(sales_daily[Sales_Y]),
+    FILTER(sales_daily, sales_daily[WorkingDay] = 1)
+)
+
+[MTD Sales Y-1] =
+CALCULATE(
+    SUM(sales_daily[Sales_Y1]),
+    FILTER(sales_daily, sales_daily[WorkingDay] = 1)
+)
+
+[MTD Sales vs Y-1 %] =
+DIVIDE([MTD Sales] - [MTD Sales Y-1], [MTD Sales Y-1], 0)
+
+[Plan Y] =
+SUM(plan_monthly[Plan_Amount])
+
+[Attainment %] =
+DIVIDE([MTD Sales], [Plan Y], 0)
+
+[Working Days Elapsed] =
+CALCULATE(
+    COUNTROWS(sales_daily),
+    sales_daily[WorkingDay] = 1,
+    NOT ISBLANK(sales_daily[Sales_Y])
+)
+
+[Working Days Total] =
+MAX(plan_monthly[Working_Days_Total])
+
+[Avg Sales Per Working Day] =
+DIVIDE([MTD Sales], [Working Days Elapsed], 0)
+
+[Avg Sales Per Working Day Y-1] =
+DIVIDE([MTD Sales Y-1], [Working Days Total], 0)
+
+[Avg vs Y-1 %] =
+DIVIDE([Avg Sales Per Working Day] - [Avg Sales Per Working Day Y-1], [Avg Sales Per Working Day Y-1], 0)
+
+// ── Forecast EOM (linear pace extrapolation) ───────────────
+
+[Forecast EOM] =
+[Avg Sales Per Working Day] * [Working Days Total]
+
+[Forecast vs Plan %] =
+DIVIDE([Forecast EOM] - [Plan Y], [Plan Y], 0)
+
+// ── Gap to plan ────────────────────────────────────────────
+
+[Gap to Plan €] =
+[MTD Sales] - [Plan Y]
+
+[Pace Plan MTD] =
+DIVIDE([Plan Y], [Working Days Total], 0) * [Working Days Elapsed]
+
+[Gap vs Pace €] =
+[MTD Sales] - [Pace Plan MTD]
+
+// ── Cumulative daily (for line charts) ─────────────────────
+
+[Cumulative Sales Y] =
+CALCULATE(
+    SUM(sales_daily[Sales_Y]),
+    FILTER(
+        ALL(sales_daily),
+        sales_daily[DayIndex] <= MAX(sales_daily[DayIndex])
+        && sales_daily[WorkingDay] = 1
+    )
+)
+
+[Cumulative Sales Y-1] =
+CALCULATE(
+    SUM(sales_daily[Sales_Y1]),
+    FILTER(
+        ALL(sales_daily),
+        sales_daily[DayIndex] <= MAX(sales_daily[DayIndex])
+        && sales_daily[WorkingDay] = 1
+    )
+)
+
+[Cumulative Plan] =
+DIVIDE([Plan Y], [Working Days Total], 0) * MAX(sales_daily[DayIndex])
+
+// ── Region table variance columns ──────────────────────────
+
+[Region Y/Y-1 %] =
+DIVIDE(
+    SUM(sales_region[Sales_Y]) - SUM(sales_region[Sales_Y1]),
+    SUM(sales_region[Sales_Y1]),
+    0
+)
+
+[Region vs Plan %] =
+DIVIDE(
+    SUM(sales_region[Sales_Y]) - SUM(sales_region[Plan_Y]),
+    SUM(sales_region[Plan_Y]),
+    0
+)
+
+// ── Business Line table variance columns ───────────────────
+
+[BL Y/Y-1 %] =
+DIVIDE(
+    SUM(sales_businessline[Sales_Y]) - SUM(sales_businessline[Sales_Y1]),
+    SUM(sales_businessline[Sales_Y1]),
+    0
+)
+
+[BL vs Plan %] =
+DIVIDE(
+    SUM(sales_businessline[Sales_Y]) - SUM(sales_businessline[Plan_Y]),
+    SUM(sales_businessline[Plan_Y]),
+    0
+)
+
+// ── Conditional format helpers (return color hex) ──────────
+
+[Color Y/Y Region] =
+IF([Region Y/Y-1 %] >= 0, "#2e8b57", "#c0563f")
+
+[Color vs Plan Region] =
+IF([Region vs Plan %] >= 0, "#2e8b57", "#c0563f")
+
+[Color Attainment] =
+IF([Attainment %] >= 1, "#2e8b57", "#c0563f")
